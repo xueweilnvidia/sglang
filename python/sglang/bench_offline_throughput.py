@@ -365,6 +365,7 @@ def throughput_test(
     # Read dataset
     # input_requests = get_dataset(bench_args, tokenizer)
     input_requests = get_trtllm_data("/lustre/fsw/coreai_devtech_china/bhsueh/datasets/qwen3/aa_prompt_isl_1k_osl_2k_qwen3_10000samples.txt", bench_args.num_prompts)
+    # input_requests = get_trtllm_data("aa_prompt_isl_1k_osl_2k_qwen3_10samples.txt", bench_args.num_prompts)
 
     warmup_requests = sample_random_requests(
         input_len=1024,

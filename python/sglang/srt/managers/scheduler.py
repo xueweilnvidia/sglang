@@ -32,6 +32,7 @@ import setproctitle
 import torch
 import zmq
 from torch.distributed import barrier
+import nvtx
 
 from sglang.global_config import global_config
 from sglang.srt.configs.model_config import ModelConfig
@@ -1162,10 +1163,10 @@ class Scheduler(
     ):
         # logger.info(self.log_count)
         self.log_count = self.log_count + 1
-        if self.log_count == 10:
+        if self.log_count == 13:
             torch.cuda.cudart().cudaProfilerStart()
             logger.info("profile start")
-        if self.log_count == 20:
+        if self.log_count == 15:
             torch.cuda.cudart().cudaProfilerStop()
             logger.info("profile stop")
 
@@ -1512,6 +1513,7 @@ class Scheduler(
         batch.prepare_for_decode()
         return batch
 
+    @nvtx.annotate(message="run_batch", color="blue")
     def run_batch(
         self, batch: ScheduleBatch
     ) -> Union[GenerationBatchResult, EmbeddingBatchResult]:
