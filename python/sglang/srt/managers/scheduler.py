@@ -186,6 +186,7 @@ class Scheduler(
         dp_rank: Optional[int],
     ):
         # Parse args
+        self.log_count = 0
         self.server_args = server_args
         self.tp_rank = tp_rank
         self.pp_rank = pp_rank
@@ -1159,6 +1160,15 @@ class Scheduler(
     def log_decode_stats(
         self, can_run_cuda_graph: bool, running_batch: ScheduleBatch = None
     ):
+        # logger.info(self.log_count)
+        self.log_count = self.log_count + 1
+        if self.log_count == 10:
+            torch.cuda.cudart().cudaProfilerStart()
+            logger.info("profile start")
+        if self.log_count == 20:
+            torch.cuda.cudart().cudaProfilerStop()
+            logger.info("profile stop")
+
         batch = running_batch or self.running_batch
 
         gap_latency = time.time() - self.last_decode_stats_tic

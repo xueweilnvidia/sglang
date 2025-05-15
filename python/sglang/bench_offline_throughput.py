@@ -198,6 +198,7 @@ def throughput_test_once(
     ignore_eos: bool,
     extra_request_body: Dict,
     profile: bool,
+    warm_up:bool
 ):
     measurement_results = {
         "backend": backend_name,
@@ -211,16 +212,28 @@ def throughput_test_once(
         "total_throughput": -1,
     }
 
-    prompt = [r[0] for r in reqs]
-    sampling_params = [
-        {
-            "temperature": 0,
-            "max_new_tokens": r[2],
-            "ignore_eos": ignore_eos,
-            **extra_request_body,
-        }
-        for r in reqs
-    ]
+    if warm_up:
+        prompt = [r[0] for r in reqs]
+        sampling_params = [
+            {
+                "temperature": 0,
+                "max_new_tokens": r[2],
+                "ignore_eos": ignore_eos,
+                **extra_request_body,
+            }
+            for r in reqs
+        ]
+    else:
+        ids = [r[0] for r in reqs]
+        sampling_params = [
+            {
+                "temperature": 0,
+                "max_new_tokens": r[1],
+                "ignore_eos": ignore_eos,
+                **extra_request_body,
+            }
+            for r in reqs
+        ]
 
     if profile:
         assert (
@@ -230,7 +243,10 @@ def throughput_test_once(
         backend.start_profile()
 
     st = time.perf_counter()
-    gen_out = backend.generate(prompt=prompt, sampling_params=sampling_params)
+    if warm_up:
+        gen_out = backend.generate(prompt=prompt, sampling_params=sampling_params)
+    else:
+        gen_out = backend.generate(input_ids=ids, sampling_params=sampling_params)
     latency = time.perf_counter() - st
 
     if profile:
@@ -301,6 +317,25 @@ def monitor_trace_file(directory, interval=1):
             break
 
 
+def get_trtllm_data(dataset_path, max_requests):
+    dataset = []
+    with open(dataset_path, "r") as stream:
+        while (line := stream.readline()) and len(dataset) < max_requests:
+        # We expect the data to come in as a JSON string.
+        # For example:
+        # {"prompt": "Generate an infinite response to the following:
+        # There once was a man who.", "output_tokens": 1000}
+        # Each line should be a complete JSON dictionary with no indentation
+        # or newline characters.
+            data = json.loads(line)
+            logits = data.get("input_ids", data.get("logits", None))
+            # task_id = data["task_id"]
+            osl = data["output_tokens"]
+            dataset.append([logits, osl])
+    return dataset
+
+
+
 def throughput_test(
     server_args: ServerArgs,
     bench_args: BenchArgs,
@@ -328,12 +363,13 @@ def throughput_test(
         extra_request_body = json.loads(args.extra_request_body)
 
     # Read dataset
-    input_requests = get_dataset(bench_args, tokenizer)
+    # input_requests = get_dataset(bench_args, tokenizer)
+    input_requests = get_trtllm_data("/lustre/fsw/coreai_devtech_china/bhsueh/datasets/qwen3/aa_prompt_isl_1k_osl_2k_qwen3_10000samples.txt", bench_args.num_prompts)
 
     warmup_requests = sample_random_requests(
-        input_len=256,
+        input_len=1024,
         output_len=16,
-        num_prompts=min(bench_args.num_prompts, 16),
+        num_prompts=min(bench_args.num_prompts, 3),
         range_ratio=1.0,
         tokenizer=tokenizer,
         dataset_path=bench_args.dataset_path,
@@ -349,6 +385,7 @@ def throughput_test(
             ignore_eos=not bench_args.disable_ignore_eos,
             extra_request_body=extra_request_body,
             profile=False,
+            warm_up=True,
         )
         time.sleep(0.5)
 
@@ -360,6 +397,7 @@ def throughput_test(
         ignore_eos=not bench_args.disable_ignore_eos,
         extra_request_body=extra_request_body,
         profile=bench_args.profile,
+        warm_up=False,
     )
     backend.shutdown()
 

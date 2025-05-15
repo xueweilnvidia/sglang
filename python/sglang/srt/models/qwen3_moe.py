@@ -23,6 +23,7 @@ from typing import Any, Dict, Iterable, Optional, Tuple
 import torch
 import torch.nn.functional as F
 from torch import nn
+import nvtx
 
 from sglang.srt.distributed import (
     get_tensor_model_parallel_rank,
@@ -95,6 +96,7 @@ class Qwen3MoeSparseMoeBlock(nn.Module):
             prefix=add_prefix("gate", prefix),
         )
 
+    @nvtx.annotate(message="moe", color="blue")
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         num_tokens, hidden_dim = hidden_states.shape
         hidden_states = hidden_states.view(-1, hidden_dim)
@@ -198,6 +200,7 @@ class Qwen3MoeAttention(nn.Module):
         k = k_by_head.view(k.shape)
         return q, k
 
+    @nvtx.annotate(message="attention", color="green")
     def forward(
         self,
         positions: torch.Tensor,
