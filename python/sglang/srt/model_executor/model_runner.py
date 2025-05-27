@@ -1099,6 +1099,7 @@ class ModelRunner:
             and self.cuda_graph_runner
             and self.cuda_graph_runner.can_run(forward_batch)
         )
+        logger.info(f"input_ids length: {forward_batch.input_ids.shape[0]}")
         if can_run_cuda_graph:
             ret = self.cuda_graph_runner.replay(
                 forward_batch,
